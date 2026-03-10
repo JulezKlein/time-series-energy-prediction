@@ -1,0 +1,100 @@
+from dotenv import load_dotenv
+import os
+from datetime import date
+from pathlib import Path
+
+import pandas as pd
+from utils.get_features import get_matched_weather_load_data
+from sklearn.preprocessing import StandardScaler
+from sklearn.compose import ColumnTransformer
+import joblib
+import torch
+import numpy as np
+
+def prepare_data_for_modeling(features: list, target: str, scale_features: list, save_scaler: bool = True, save_data: bool = True):
+    load_dotenv()
+
+    entsoe_api_key = os.getenv("ENTSOE_API_KEY")
+
+    project_root = Path(__file__).resolve().parents[1]
+    data_dir = project_root / "data"
+    models_dir = project_root / "models"
+
+    train_out_path = data_dir / "train_data_2018_2023.parquet"
+    val_out_path = data_dir / "val_data_2024.parquet"
+    test_out_path = data_dir / "test_data_2025.parquet"
+
+    if not train_out_path.exists():
+        # Training data from 2018 to 2023
+        train_df = get_matched_weather_load_data(start_date=date(2018, 1, 1), end_date=date(
+            2023, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key)
+        if save_data:
+            train_df.to_parquet(train_out_path)
+    else:
+        train_df = pd.read_parquet(train_out_path)
+
+    if not val_out_path.exists():
+        # Validation data from 2024
+        val_df = get_matched_weather_load_data(start_date=date(2024, 1, 1), end_date=date(
+            2024, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key)
+        if save_data:
+            val_df.to_parquet(val_out_path)
+    else:
+        val_df = pd.read_parquet(val_out_path)
+
+    if not test_out_path.exists():
+        # Test data from 2025
+        test_df = get_matched_weather_load_data(start_date=date(2025, 1, 1), end_date=date(
+            2025, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key)
+        if save_data:
+            test_df.to_parquet(test_out_path)
+    else:
+        test_df = pd.read_parquet(test_out_path)
+
+    # Features + Target (actual load data of the day in MW)
+    X_train = train_df[features]
+    y_train = train_df[target]
+
+    X_val = val_df[features]
+    y_val = val_df[target]
+
+    X_test = test_df[features]
+    y_test = test_df[target]
+    
+    scaler = ColumnTransformer(
+    transformers=[
+        ("num", StandardScaler(), scale_features)
+    ],
+    remainder="passthrough"
+)
+
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_val_scaled = scaler.transform(X_val)
+    X_test_scaled = scaler.transform(X_test)
+
+    joblib.dump(scaler, models_dir / "feature_scaler.joblib") if save_scaler else None
+    return {'train_df': train_df, 'val_df': val_df, 'test_df': test_df, 'X_train_scaled': X_train_scaled, 'X_train': X_train, 'y_train': y_train, 'X_val_scaled': X_val_scaled, 'X_val': X_val, 'y_val': y_val, 'X_test_scaled': X_test_scaled, 'X_test': X_test, 'y_test': y_test}, {'scaler_mean': scaler.named_transformers_["num"].mean_, 'scaler_std': scaler.named_transformers_["num"].scale_}
+
+
+def create_torch_dataset(X: np.ndarray, y: np.ndarray, window_size: int):
+    """Transform a time series into a prediction dataset
+    
+    Args:
+        X: A numpy array of features, first dimension is the time steps
+        y: A numpy array of targets, first dimension is the time steps
+        window_size: Size of window for prediction
+    """
+    X_np = np.asarray(X)
+    y_np = np.asarray(y).reshape(-1)
+
+    X_windows, y_windows = [], []
+    for i in range(len(X_np) - window_size + 1):
+        feature_window = X_np[i:i + window_size]
+        target_value = y_np[i + window_size - 1]
+        X_windows.append(feature_window)
+        y_windows.append(target_value)
+
+    X_windows = np.asarray(X_windows)
+    y_windows = np.asarray(y_windows)
+
+    return torch.tensor(X_windows, dtype=torch.float32), torch.tensor(y_windows, dtype=torch.float32)
