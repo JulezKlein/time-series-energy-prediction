@@ -4,6 +4,7 @@ import pandas as pd
 import torch
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
+
 def evaluate_and_plot_model_sklearn(model, X_test_scaled, y_test, test_df):
     y_pred_test = model.predict(X_test_scaled)
 
@@ -61,7 +62,8 @@ def evaluate_and_plot_model_torch(
     with torch.no_grad():
         for X_batch, _ in test_loader:
             X_batch = X_batch.to(device)
-            y_pred_batches.append(model(X_batch).squeeze(-1).detach().cpu().numpy())
+            y_pred_batches.append(
+                model(X_batch).squeeze(-1).detach().cpu().numpy())
 
     if not y_pred_batches:
         raise ValueError("Test loader produced no batches.")
@@ -84,21 +86,25 @@ def evaluate_and_plot_model_torch(
             "actual": y_true_values,
             "predicted": y_pred_test.values,
         },
-        index=test_df.loc[y_true_aligned.index, "time"] if "time" in test_df.columns else y_true_aligned.index,
+        index=test_df.loc[y_true_aligned.index,
+                          "time"] if "time" in test_df.columns else y_true_aligned.index,
     ).sort_index()
 
     pred_std = float(plot_df["predicted"].std())
     if pred_std < 1e-6:
         print("Warning: model predictions are nearly constant. The loaded checkpoint appears collapsed to a mean prediction.")
 
-    print(f"Test MAE: {mean_absolute_error(plot_df['actual'], plot_df['predicted']):.2f}")
-    print(f"Test RMSE: {np.sqrt(mean_squared_error(plot_df['actual'], plot_df['predicted'])):.2f}")
+    print(
+        f"Test MAE: {mean_absolute_error(plot_df['actual'], plot_df['predicted']):.2f}")
+    print(
+        f"Test RMSE: {np.sqrt(mean_squared_error(plot_df['actual'], plot_df['predicted'])):.2f}")
     # print("\nPredictions vs actual values (first 20 rows):")
     # print(plot_df[["actual", "predicted"]].head(20).to_string())
 
     plt.figure(figsize=(14, 5))
     plt.plot(plot_df.index, plot_df["actual"], label="Actual", linewidth=1.8)
-    plt.plot(plot_df.index, plot_df["predicted"], label="Predicted", linewidth=1.5, alpha=0.85)
+    plt.plot(plot_df.index, plot_df["predicted"],
+             label="Predicted", linewidth=1.5, alpha=0.85)
     plt.title("Test Set: Predicted vs Actual Load")
     plt.xlabel("Date")
     plt.ylabel("Load (MW)")

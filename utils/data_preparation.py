@@ -11,7 +11,7 @@ import joblib
 import torch
 import numpy as np
 
-def prepare_data_for_modeling(features: list, target: str, scale_features: list, save_scaler: bool = True, save_data: bool = True):
+def prepare_data_for_modeling(features: list, target: str, scale_features: list, save_scaler: bool = True, save_data: bool = True, reprocess_data: bool = False):
     load_dotenv()
 
     entsoe_api_key = os.getenv("ENTSOE_API_KEY")
@@ -24,28 +24,31 @@ def prepare_data_for_modeling(features: list, target: str, scale_features: list,
     val_out_path = data_dir / "val_data_2024.parquet"
     test_out_path = data_dir / "test_data_2025.parquet"
 
-    if not train_out_path.exists():
+    if not train_out_path.exists() or reprocess_data:
         # Training data from 2018 to 2023
         train_df = get_matched_weather_load_data(start_date=date(2018, 1, 1), end_date=date(
-            2023, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key)
+            2023, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key,
+            align_calendar_to_target_day=True)
         if save_data:
             train_df.to_parquet(train_out_path)
     else:
         train_df = pd.read_parquet(train_out_path)
 
-    if not val_out_path.exists():
+    if not val_out_path.exists() or reprocess_data:
         # Validation data from 2024
         val_df = get_matched_weather_load_data(start_date=date(2024, 1, 1), end_date=date(
-            2024, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key)
+            2024, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key,
+            align_calendar_to_target_day=True)
         if save_data:
             val_df.to_parquet(val_out_path)
     else:
         val_df = pd.read_parquet(val_out_path)
 
-    if not test_out_path.exists():
+    if not test_out_path.exists() or reprocess_data:
         # Test data from 2025
         test_df = get_matched_weather_load_data(start_date=date(2025, 1, 1), end_date=date(
-            2025, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key)
+            2025, 12, 31), country_code="DE", locations=3, api_key=entsoe_api_key,
+            align_calendar_to_target_day=True)
         if save_data:
             test_df.to_parquet(test_out_path)
     else:

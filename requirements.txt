@@ -28,7 +28,7 @@ fonttools==4.61.1
 fqdn==1.5.1
 fsspec==2026.2.0
 h11==0.16.0
-holidays==0.91
+holidays==0.92
 httpcore==1.0.9
 httpx==0.28.1
 idna==3.11
