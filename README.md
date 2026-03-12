@@ -40,9 +40,9 @@ pip install -r requirements.txt
 
 ### Lightweight install hint
 
-The current requirements.txt may include many notebook-related packages because it was generated from a full environment snapshot.
+The current requirements.txt includes many notebook-related packages because it was generated from a full environment snapshot.
 
-Optionally: Install core packages manually:
+Optional: install core packages manually:
 
 ```bash
 pip install pandas numpy scikit-learn xgboost torch meteostat entsoe-py holidays python-dotenv matplotlib seaborn joblib fastparquet
@@ -61,7 +61,7 @@ ENTSOE_API_KEY=your_key_here
 ```
 
 Notes:
-- The loader searches for .env in project root and current working directory.
+- The loader searches for .env in the project root and current working directory.
 - You can also pass api_key directly to data functions.
 
 ## Feature Engineering (Current)
@@ -81,7 +81,7 @@ Generated in utils/get_features.py:
 
 ### Weather features
 
-Averaged across selected cities (default: first 3 or 4, depending on call):
+Averaged across selected cities (configured in the notebook call):
 
 - Temp
 - Min Temp
@@ -92,11 +92,18 @@ Averaged across selected cities (default: first 3 or 4, depending on call):
 
 ### Calendar features
 
-- is_holiday (Germany-wide holidays)
-- dow_sin, dow_cos
-- month_sin, month_cos
+- is_holiday: Germany-wide holidays
+- dow_sin, dow_cos: Cyclical encoded day of the week
+- month_sin, month_cos: Cyclical encoded month
 
-When align_calendar_to_target_day=True (default in current matching function), calendar features are shifted so row t uses calendar context for the target day t+1.
+When align_calendar_to_target_day=True (default in the matching function), calendar features are shifted so row t uses calendar context for target day t+1.
+
+### Feature Importance Analysis
+
+Feature importance was estimated using permutation importance with the trained Random Forest forecaster on the 2025 test dataset. Features with larger performance drops are more influential for day-ahead load prediction.
+
+![Random Forest permutation feature importance](img/feature_importance.png)
+
 
 ## Data Preparation
 
@@ -124,3 +131,11 @@ Open training_DL_models.ipynb and run cells in order.
 
 Model:
 - LSTMForecaster (windowed sequence input)
+
+## Results
+
+### LSTM Forecaster
+This plot shows the predicted next-day load for the 2025 test dataset using the trained LSTM forecaster:
+
+![LSTM test dataset output](img/output_lstm_test_ds.png)
+
