@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime
+import logging
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import joblib
@@ -12,6 +13,12 @@ import torch
 from utils.get_features import get_matched_weather_load_data
 from utils.lstm_model import LSTMForecaster
 from utils.train_lstm import FEATURES, TARGETS, WINDOW_SIZE, DEVICE, train_lstm_model
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 MODEL_PATH = Path("models/best_lstm_multiday_load_forecaster.pt")
@@ -39,11 +46,11 @@ def load_data_df(
         else:
             raise ValueError("Only .parquet and .csv input files are supported")
     else:
-        if start_date is None or end_date is None:
-            raise ValueError("start_date and end_date are required when data_path is not provided")
+        if start_date is None:
+            raise ValueError("start_date is required when data_path is not provided")
 
         resolved_start = pd.Timestamp(start_date).date()
-        resolved_end = pd.Timestamp(end_date).date()
+        resolved_end = pd.Timestamp(end_date).date() if end_date is not None else (date.today() - timedelta(days=1))
         data_df = get_matched_weather_load_data(
             start_date=resolved_start,
             end_date=resolved_end,
@@ -51,6 +58,19 @@ def load_data_df(
             locations=locations,
             api_key=api_key,
             align_calendar_to_target_day=True,
+        )
+        logger.info(f"Fetched data automatically from {resolved_start} to {resolved_end}.")
+
+    if data_df is None:
+        raise RuntimeError(
+            "Data loader returned no dataframe. Check ENTSOE API key and weather provider availability."
+        )
+    if not isinstance(data_df, pd.DataFrame):
+        raise TypeError(f"Expected pandas.DataFrame from data loader, got {type(data_df)}")
+    if data_df.empty:
+        raise RuntimeError(
+            "Loaded dataframe is empty. Use a wider date range (at least ~45 days) because lag and horizon features "
+            "remove early/late rows, and verify data provider/API credentials."
         )
 
     if "time" in data_df.columns:
@@ -197,7 +217,7 @@ def run_pipeline(
             model_path=model_path,
             scaler_path=scaler_path,
         )
-        print(predictions_df.tail())
+        logger.info("Prediction tail:\n%s", predictions_df.tail().to_string())
         return predictions_df
 
     if action == "retrain":
@@ -208,9 +228,10 @@ def run_pipeline(
             checkpoint_path=model_path,
             scaler_path=scaler_path,
         )
-        print(
-            f"Retraining finished. Best epoch: {training_result['best_epoch']}, "
-            f"best validation MSE: {training_result['best_val_mse']:.6f}"
+        logger.info(
+            "Retraining finished. Best epoch: %s, best validation MSE: %.6f",
+            training_result["best_epoch"],
+            training_result["best_val_mse"],
         )
         return training_result
 
@@ -222,7 +243,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("action", choices=["predict", "retrain"])
     parser.add_argument("--data-path", type=str, default=None, help="Path to raw input dataframe (.parquet or .csv)")
     parser.add_argument("--start-date", type=str, default=None, help="Fetch start date, e.g. 2018-01-01")
-    parser.add_argument("--end-date", type=str, default=None, help="Fetch end date, e.g. 2026-03-13")
+    parser.add_argument("--end-date", type=str, default=None, help="Fetch end date. If omitted, yesterday is used automatically.")
     parser.add_argument("--country-code", type=str, default="DE")
     parser.add_argument("--locations", type=int, default=3)
     parser.add_argument("--validation-fraction", type=float, default=0.2)
