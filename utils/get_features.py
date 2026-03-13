@@ -82,6 +82,9 @@ def get_load_data(
 
     # Add the target for the prediction task: load of the next day
     df_load["load_t+1"] = df_load["load"].shift(-1)
+    df_load["load_t+2"] = df_load["load"].shift(-2)
+    df_load["load_t+3"] = df_load["load"].shift(-3)
+    df_load["load_t+4"] = df_load["load"].shift(-4)
 
     df_load = df_load.reset_index().rename(columns={"index": "time"})
     return df_load

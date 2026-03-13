@@ -10,8 +10,9 @@ from sklearn.compose import ColumnTransformer
 import joblib
 import torch
 import numpy as np
+from typing import Union
 
-def prepare_data_for_modeling(features: list, target: str, scale_features: list, save_scaler: bool = True, save_data: bool = True, reprocess_data: bool = False):
+def prepare_data_for_modeling(features: list, target: Union[str, list], scale_features: list, save_scaler: bool = True, save_data: bool = True, reprocess_data: bool = False):
     load_dotenv()
 
     entsoe_api_key = os.getenv("ENTSOE_API_KEY")
@@ -54,15 +55,32 @@ def prepare_data_for_modeling(features: list, target: str, scale_features: list,
     else:
         test_df = pd.read_parquet(test_out_path)
 
+    if isinstance(target, str):
+        target_columns = [target]
+        return_series_target = True
+    elif isinstance(target, list):
+        if not target:
+            raise ValueError("target list cannot be empty")
+        target_columns = target
+        return_series_target = False
+    else:
+        raise TypeError("target must be a string column name or a list of column names")
+
     # Features + Target (actual load data of the day in MW)
     X_train = train_df[features]
-    y_train = train_df[target]
+    y_train = train_df[target_columns]
 
     X_val = val_df[features]
-    y_val = val_df[target]
+    y_val = val_df[target_columns]
 
     X_test = test_df[features]
-    y_test = test_df[target]
+    y_test = test_df[target_columns]
+
+    # Backward compatibility: keep Series output when a single target string is provided.
+    if return_series_target:
+        y_train = y_train.iloc[:, 0]
+        y_val = y_val.iloc[:, 0]
+        y_test = y_test.iloc[:, 0]
     
     scaler = ColumnTransformer(
     transformers=[
@@ -88,12 +106,21 @@ def create_torch_dataset(X: np.ndarray, y: np.ndarray, window_size: int):
         window_size: Size of window for prediction
     """
     X_np = np.asarray(X)
-    y_np = np.asarray(y).reshape(-1)
+    y_np = np.asarray(y)
+    if y_np.ndim == 1:
+        single_target = True
+    elif y_np.ndim == 2:
+        single_target = False
+    else:
+        raise ValueError("y must be a 1D array-like or a 2D array-like for multi-target data")
 
     X_windows, y_windows = [], []
     for i in range(len(X_np) - window_size + 1):
         feature_window = X_np[i:i + window_size]
-        target_value = y_np[i + window_size - 1]
+        if single_target:
+            target_value = y_np[i + window_size - 1]
+        else:
+            target_value = y_np[i + window_size - 1, :]
         X_windows.append(feature_window)
         y_windows.append(target_value)
 

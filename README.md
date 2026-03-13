@@ -154,7 +154,7 @@ Open training_DL_models.ipynb and run cells in order.
 Model:
 - LSTMForecaster (windowed sequence input)
 
-## Results
+## Results - Single day forecasting
 
 ### Random Forest Forecaster
 This plot shows the predicted next-day load for the 2025 test dataset using the trained Random Forest forecaster:
