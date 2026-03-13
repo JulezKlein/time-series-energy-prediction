@@ -70,14 +70,14 @@ Notes:
 
 Generated in utils/get_features.py:
 
-- load_today: daily average load for current day
-- lag_2: previous day load (shifted by 1)
-- lag_7: target-day-aligned weekly lag (shifted by 6)
-- lag_14: target-day-aligned biweekly lag (shifted by 13)
-- lag_30: target-day-aligned monthly lag (shifted by 29)
+- load: daily average load for current day
+- load_lag_1: previous day load (shifted by 1)
+- load_lag_7: target-day-aligned weekly lag (shifted by 6)
+- load_lag_14: target-day-aligned biweekly lag (shifted by 13)
+- load_lag_30: target-day-aligned monthly lag (shifted by 29)
 - rolling_mean_7, rolling_mean_14, rolling_mean_30
 - std_7, std_14, std_30
-- load_prediction: target, next-day load
+- load_t+1: target, next-day load
 
 ### Weather features
 
@@ -89,6 +89,8 @@ Averaged across selected cities (configured in the notebook call):
 - Wind Speed
 - Sunshine Duration
 - Cloud Cover
+- Cooling Degrees: degrees above 22 °C (cooling demand proxy)
+- Heating Degrees: degrees below 17 °C (heating demand proxy)
 
 ### Calendar features
 
@@ -103,6 +105,26 @@ When align_calendar_to_target_day=True (default in the matching function), calen
 Feature importance was estimated using permutation importance with the trained Random Forest forecaster on the 2025 test dataset. Features with larger performance drops are more influential for day-ahead load prediction.
 
 ![Random Forest permutation feature importance](img/feature_importance.png)
+
+The SHAP feature importance analysis provides quite similar insights:
+
+![SHAP feature importance](img/shap_feature_importance.png)
+
+### Omitted Features
+
+Based on permutation importance, XGBoost feature importance, and SHAP analysis, the following features contribute negligibly to predictive performance and are excluded from model training (`LOW_IMPORTANCE_FEATURES`):
+
+| Feature | Reason |
+|---|---|
+| Wind Speed | Near-zero importance across all methods |
+| Sunshine Duration | Near-zero importance across all methods |
+| Cloud Cover | Near-zero importance across all methods |
+| Cooling Degrees | Minimal contribution; dominated by temperature features |
+| Heating Degrees | Minimal contribution; dominated by temperature features |
+| std_7 | Rolling standard deviation adds no predictive signal |
+| std_14 | Rolling standard deviation adds no predictive signal |
+
+The active feature set used for training is: `Temp`, `Min Temp`, `Max Temp`, `load`, `load_lag_1`, `load_lag_7`, `load_lag_14`, `rolling_mean_7`, `rolling_mean_14`, `is_holiday`, `dow_sin`, `dow_cos`, `month_sin`, `month_cos`.
 
 
 ## Data Preparation
@@ -134,8 +156,29 @@ Model:
 
 ## Results
 
+### Random Forest Forecaster
+This plot shows the predicted next-day load for the 2025 test dataset using the trained Random Forest forecaster:
+
+![Random Forest test dataset output](img/output_rf_test_ds.png)
+
+### XGBoost Forecaster
+This plot shows the predicted next-day load for the 2025 test dataset using the trained XGBoost forecaster:
+
+![XGBoost test dataset output](img/output_xgboost_test_ds.png)
+
 ### LSTM Forecaster
 This plot shows the predicted next-day load for the 2025 test dataset using the trained LSTM forecaster:
 
 ![LSTM test dataset output](img/output_lstm_test_ds.png)
+
+### Performance Comparison (Test dataset; 2025)
+
+| Model | MAE | RMSE |
+|---|---|---|
+| Random Forest | 1044.60 | 1365.51 |
+| XGBoost | 975.32 | 1286.03 |
+| LSTM |  960.19 | 1232.26 |
+
+### Takeaway
+The LSTM model sligtly outperforms the other models and therefore will be used for the deployment in the Streamlit application and the multi-day forecasting.
 

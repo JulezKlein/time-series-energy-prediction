@@ -65,23 +65,23 @@ def get_load_data(
     df_load = (
         load_series.resample("D")
         .mean()
-        .to_frame(name="load_today")
+        .to_frame(name="load")
     )
 
     # Add lag features and rolling mean for temporal patterns
-    df_load["lag_2"] = df_load["load_today"].shift(1)  # Yesterday's load
-    df_load["lag_7"] = df_load["load_today"].shift(6)  # Load from the target day last week
-    df_load["lag_14"] = df_load["load_today"].shift(13)  # Load from target day two weeks ago
-    df_load["lag_30"] = df_load["load_today"].shift(29)  # Load from target day last month
-    df_load["rolling_mean_7"] = df_load["load_today"].rolling(7).mean()  # 7-day rolling mean
-    df_load["rolling_mean_14"] = df_load["load_today"].rolling(14).mean()  # 14-day rolling mean
-    df_load["rolling_mean_30"] = df_load["load_today"].rolling(30).mean()  # 30-day rolling mean
-    df_load["std_7"] = df_load["load_today"].rolling(7).std()  # 7-day rolling std
-    df_load["std_14"] = df_load["load_today"].rolling(14).std()  # 14-day rolling std
-    df_load["std_30"] = df_load["load_today"].rolling(30).std()  # 30-day rolling std
+    df_load["load_lag_1"] = df_load["load"].shift(1)  # Yesterday's load
+    df_load["load_lag_7"] = df_load["load"].shift(6)  # Load from the target day last week
+    df_load["load_lag_14"] = df_load["load"].shift(13)  # Load from target day two weeks ago
+    df_load["load_lag_30"] = df_load["load"].shift(29)  # Load from target day last month
+    df_load["rolling_mean_7"] = df_load["load"].rolling(7).mean()  # 7-day rolling mean
+    df_load["rolling_mean_14"] = df_load["load"].rolling(14).mean()  # 14-day rolling mean
+    df_load["rolling_mean_30"] = df_load["load"].rolling(30).mean()  # 30-day rolling mean
+    df_load["std_7"] = df_load["load"].rolling(7).std()  # 7-day rolling std
+    df_load["std_14"] = df_load["load"].rolling(14).std()  # 14-day rolling std
+    df_load["std_30"] = df_load["load"].rolling(30).std()  # 30-day rolling std
 
     # Add the target for the prediction task: load of the next day
-    df_load["load_prediction"] = df_load["load_today"].shift(-1)
+    df_load["load_t+1"] = df_load["load"].shift(-1)
 
     df_load = df_load.reset_index().rename(columns={"index": "time"})
     return df_load
@@ -107,6 +107,9 @@ def get_weather_and_calender_data(start_date: date, end_date: date, locations: i
         "Cologne": ms.Point(50.9375, 6.9603, 37),
         "Hamburg": ms.Point(53.5511, 9.9937, 8),
     }
+    
+    HEATING_THRESHOLD = 17  # °C, below which heating demand typically increases
+    COOLING_THRESHOLD = 22  # °C, above which cooling demand typically increases
 
     # Fetch daily average, minimum and maximum temperature for each city
     city_weather = {}
@@ -150,6 +153,10 @@ def get_weather_and_calender_data(start_date: date, end_date: date, locations: i
         }
     )
 
+    # Temperature-based features for heating and cooling demand estimation. Based on the assumed thresholds, these features capture the degree to which a day is likely to require heating or cooling.
+    weather_df["Cooling Degrees"] = (weather_df["Temp"] - COOLING_THRESHOLD).clip(lower=0)
+    weather_df["Heating Degrees"] = (HEATING_THRESHOLD - weather_df["Temp"]).clip(lower=0)
+    
     datetime_index = pd.DatetimeIndex(pd.to_datetime(weather_df.index))
     weather_df.index = datetime_index
 
