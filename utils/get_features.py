@@ -82,6 +82,9 @@ def get_load_data(
     df_load["load_t+2"] = df_load["load"].shift(-2)
     df_load["load_t+3"] = df_load["load"].shift(-3)
     df_load["load_t+4"] = df_load["load"].shift(-4)
+    df_load["load_t+5"] = df_load["load"].shift(-5)
+    df_load["load_t+6"] = df_load["load"].shift(-6)
+    df_load["load_t+7"] = df_load["load"].shift(-7)
 
     df_load = df_load.reset_index().rename(columns={"index": "time"})
     return df_load

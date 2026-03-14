@@ -159,3 +159,84 @@ def create_torch_dataset(X: np.ndarray, y: np.ndarray, window_size: int):
     y_windows = np.asarray(y_windows)
 
     return torch.tensor(X_windows, dtype=torch.float32), torch.tensor(y_windows, dtype=torch.float32)
+
+
+def prepare_lstm_loaders_with_target_scaling(
+    data_dict: dict,
+    window_size: int,
+    batch_size: int,
+    training: bool = True,
+    test: bool = True,
+):
+    """Prepare scaled targets and optional train/val/test DataLoaders for LSTM training.
+
+    This utility supports both single-target (Series-like) and multi-target (DataFrame-like)
+    targets. Target scaling is always computed on the train split only to avoid leakage.
+    """
+    y_train_raw = data_dict["y_train"]
+    y_val_raw = data_dict["y_val"]
+    y_test_raw = data_dict["y_test"]
+
+    if getattr(y_train_raw, "ndim", None) == 1:
+        target_mean = float(y_train_raw.mean())
+        target_std = float(y_train_raw.std())
+        if target_std <= 0:
+            raise ValueError("Target standard deviation must be > 0 for scaling.")
+
+        print(f"Target scaling -> mean: {target_mean:.2f}, std: {target_std:.2f}")
+    else:
+        target_mean = y_train_raw.mean(axis=0)
+        target_std = y_train_raw.std(axis=0)
+        if (target_std <= 0).any():
+            raise ValueError("All target standard deviations must be > 0 for scaling.")
+
+        print("Target scaling ->")
+        print("mean:", target_mean.round(2).to_dict())
+        print("std:", target_std.round(2).to_dict())
+
+    y_train = (y_train_raw - target_mean) / target_std
+    y_val = (y_val_raw - target_mean) / target_std
+    y_test = (y_test_raw - target_mean) / target_std
+
+    prepared = {
+        "y_train_raw": y_train_raw,
+        "y_val_raw": y_val_raw,
+        "y_test_raw": y_test_raw,
+        "y_train": y_train,
+        "y_val": y_val,
+        "y_test": y_test,
+        "target_mean": target_mean,
+        "target_std": target_std,
+    }
+
+    if training:
+        X_train_tensor, y_train_tensor = create_torch_dataset(
+            X=data_dict["X_train_scaled"], y=y_train, window_size=window_size
+        )
+        X_val_tensor, y_val_tensor = create_torch_dataset(
+            X=data_dict["X_val_scaled"], y=y_val, window_size=window_size
+        )
+
+        prepared["training_loader"] = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(X_train_tensor, y_train_tensor),
+            shuffle=True,
+            batch_size=batch_size,
+        )
+        prepared["validation_loader"] = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(X_val_tensor, y_val_tensor),
+            shuffle=False,
+            batch_size=batch_size,
+        )
+
+    if test:
+        X_test_tensor, y_test_tensor = create_torch_dataset(
+            X=data_dict["X_test_scaled"], y=y_test, window_size=window_size
+        )
+        prepared["test_loader"] = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(X_test_tensor, y_test_tensor),
+            shuffle=False,
+            batch_size=batch_size,
+        )
+        prepared["test_df"] = data_dict["test_df"]
+
+    return prepared

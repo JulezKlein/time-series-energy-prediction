@@ -208,6 +208,9 @@ __marimo__/
 
 .vscode/
 
-data/
-models/
+data/*
+!data/latest_production_frame.parquet
+models/*
+!models/production_lstm_multiday_load_forecaster.pt
+!models/best_lstm_multiday_feature_scaler.joblib
 .env

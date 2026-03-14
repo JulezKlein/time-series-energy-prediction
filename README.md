@@ -1,20 +1,20 @@
 # Time Series Energy Prediction
 
-Forecast day-ahead electricity load using weather, calendar context, and historical load signals.
+Forecast electricity load for both day-ahead and multi-day horizons using weather, calendar context, and historical load signals.
 
 This repository combines:
 - Data collection from ENTSO-E (load) and Meteostat (weather)
 - Feature engineering for classical ML and deep learning
-- Model training notebooks for Random Forest, XGBoost, and LSTM
+- Model training notebooks for Random Forest, XGBoost, day-ahead LSTM, and multi-day LSTM
 
 ## What This Project Does
 
-The pipeline builds a daily dataset and predicts next-day load.
+The pipeline builds a daily dataset and supports both next-day and multi-day load forecasting.
 
 1. Pull load time series from ENTSO-E.
 2. Pull weather for multiple German cities and average to national-level weather indicators.
 3. Engineer lag, rolling, and calendar features.
-4. Train and evaluate models on chronological splits:
+4. Train and evaluate forecasting models on chronological splits:
 	- Train: 2018-2023
 	- Validation: 2024
 	- Test: 2025
@@ -27,7 +27,8 @@ The pipeline builds a daily dataset and predicts next-day load.
 - utils/data_preparation.py : split, scaling, dataset preparation
 - utils/visualize_model_performance.py : evaluation plots and metrics
 - training_ML_models.ipynb : Random Forest and XGBoost workflow
-- training_DL_models.ipynb : LSTM workflow
+- training_LSTM_oneday.ipynb : day-ahead LSTM workflow
+- training_LSTM_multiday.ipynb : multi-day LSTM workflow
 
 ## Installation
 
@@ -149,12 +150,17 @@ Models:
 
 ### Deep Learning
 
-Open training_DL_models.ipynb and run cells in order.
+Open training_LSTM_oneday.ipynb and run cells in order.
 
 Model:
 - LSTMForecaster (windowed sequence input)
 
-## Results - Single day forecasting
+Open training_LSTM_multiday.ipynb and run cells in order.
+
+Model:
+- Multi-day LSTM forecaster
+
+## Results - Day-Ahead Forecasting
 
 ### Random Forest Forecaster
 This plot shows the predicted next-day load for the 2025 test dataset using the trained Random Forest forecaster:
@@ -180,5 +186,9 @@ This plot shows the predicted next-day load for the 2025 test dataset using the 
 | LSTM |  960.19 | 1232.26 |
 
 ### Takeaway
-The LSTM model sligtly outperforms the other models and therefore will be used for the deployment in the Streamlit application and the multi-day forecasting.
+The day-ahead LSTM model slightly outperforms the other day-ahead baselines. In addition, the repository now includes a dedicated multi-day LSTM workflow and trained artifacts for multi-day forecasting.
 
+## Multi-Day Forecasting
+For mult-day forecasting, up to one week, we use the LSTM model. The graphical representation of the forecast can be seen in a streamlit dashboard. Prerequesites are a valid ENTSO-E API key and the installation of all necessary python libraries (see requirements.txt). The following screenshot shows the actual load data from 2026-02-11 until 2026-03-12 (blue), the hypothetical predictions for the last week (green), and the forecast for the following week (orange). 
+
+![Multi-Day Prediction of the LSTM Forecaster](img/streamlit_prediction_plot.png)
