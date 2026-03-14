@@ -396,9 +396,6 @@ def main() -> None:
     last_month_df = pd.DataFrame(production_df.loc[recent_mask, prediction_columns]).copy()
     last_month_df = last_month_df.sort_values("time")
 
-    st.subheader("Last Month Input Data (Prediction Features)")
-    st.dataframe(last_month_df, width='stretch', hide_index=True)
-
     st.subheader("Forecast for Next Days")
     st.dataframe(forecast_df, width='stretch', hide_index=True)
 
@@ -411,6 +408,9 @@ def main() -> None:
         ),
         width='stretch',
     )
+    
+    st.subheader("Last Month Input Data (Prediction Features)")
+    st.dataframe(last_month_df, width='stretch', hide_index=True)
 
 
 if __name__ == "__main__":
